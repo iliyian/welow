@@ -1,0 +1,37 @@
+name: macOS build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Build frontend
+        run: |
+          npx tsc
+          npx vite build
+      - name: Package macOS arm64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npx electron-builder --mac dmg zip --arm64 --publish never '--config.npmRebuild=false' || \
+          npx electron-builder --mac zip --arm64 --publish never '--config.npmRebuild=false'
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload v5.0.0 release/*.dmg release/*.zip release/latest*.yml --clobber || true
+          gh release view v5.0.0 --json assets --jq '.assets[].name'
